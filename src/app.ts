@@ -19,10 +19,16 @@ import contactRoutes from './routes/contact.routes';
 const app = express();
 
 app.use(helmet());
-
 app.use(
   cors({
-    origin: true,
+    origin: [
+      'localhost:5173',
+      'http://localhost:5173',
+      'ucpe.vercel.app',
+      'ucpe.vercel.app/',
+      'https://ucpe.vercel.app',
+      'https://ucpe.vercel.app/',
+    ],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
