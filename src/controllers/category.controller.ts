@@ -18,14 +18,14 @@ export const getCategoryTree = asyncHandler(async (_req: Request, res: Response)
 
 /** GET /categories/:id/children  — direct children */
 export const getCategoryChildren = asyncHandler(async (req: Request, res: Response) => {
-  const id = parseInt((req.params.id as string) as string, 10);
+  const id = parseInt(req.params.id as string, 10);
   const data = await CategoryModel.findChildren(id);
   res.json({ success: true, data });
 });
 
 /** GET /categories/:id/breadcrumb  — ancestor chain */
 export const getCategoryBreadcrumb = asyncHandler(async (req: Request, res: Response) => {
-  const id = parseInt((req.params.id as string) as string, 10);
+  const id = parseInt(req.params.id as string, 10);
   const data = await CategoryModel.findBreadcrumb(id);
   res.json({ success: true, data });
 });
@@ -44,7 +44,7 @@ export const createCategory = asyncHandler(async (req: Request, res: Response) =
 
 /** PUT /categories/:id */
 export const updateCategory = asyncHandler(async (req: Request, res: Response) => {
-  const id              = parseInt((req.params.id as string) as string, 10);
+  const id                        = parseInt(req.params.id as string, 10);
   const { name, slug: rawSlug, parentId } = req.body;
   const slug = rawSlug ?? (name ? await uniqueSlug(name, 'categories', id) : undefined);
 
@@ -54,6 +54,6 @@ export const updateCategory = asyncHandler(async (req: Request, res: Response) =
 
 /** DELETE /categories/:id */
 export const deleteCategory = asyncHandler(async (req: Request, res: Response) => {
-  await CategoryModel.delete(parseInt((req.params.id as string) as string, 10));
+  await CategoryModel.delete(parseInt(req.params.id as string, 10));
   res.json({ success: true, message: 'Category deleted. Children parentId set to NULL.' });
 });

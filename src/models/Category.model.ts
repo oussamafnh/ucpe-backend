@@ -8,12 +8,11 @@ export interface Category extends RowDataPacket {
   name:      string;
   slug:      string;
   parentId:  number | null;
-  depth:     number;           // 0 = root, 1 = sub, 2 = subsub
+  depth:     number;
   createdAt: Date;
   updatedAt: Date;
 }
 
-/** Full tree node returned by findTree() */
 export interface CategoryNode {
   id:       number;
   name:     string;
@@ -33,24 +32,13 @@ export interface CreateCategoryDto {
 
 export const CategoryModel = {
 
-  /** Flat list of all categories ordered by depth then name */
   async findAll(): Promise<Category[]> {
     const [rows] = await pool.query<Category[]>(
       'SELECT id, name, slug, parentId, depth FROM categories ORDER BY depth ASC, name ASC'
     );
-    return rows;
+    return normalizeCategoryNames(rows);
   },
 
-  /**
-   * Nested tree:
-   * [
-   *   { id:1, name:"technique", depth:0, children: [
-   *       { id:2, name:"éclairage & effet", depth:1, children: [
-   *           { id:3, name:"effets speciaux", depth:2, children:[] }
-   *       ]}
-   *   ]}
-   * ]
-   */
   async findTree(): Promise<CategoryNode[]> {
     const flat = await CategoryModel.findAll();
     return buildTree(flat, null);
@@ -60,28 +48,25 @@ export const CategoryModel = {
     const [rows] = await pool.query<Category[]>(
       'SELECT * FROM categories WHERE id = ?', [id]
     );
-    return rows[0] ?? null;
+    const row = rows[0] ?? null;
+    return row ? normalizeCategoryNames([row])[0] : null;
   },
 
   async findBySlug(slug: string): Promise<Category | null> {
     const [rows] = await pool.query<Category[]>(
       'SELECT * FROM categories WHERE slug = ?', [slug]
     );
-    return rows[0] ?? null;
+    const row = rows[0] ?? null;
+    return row ? normalizeCategoryNames([row])[0] : null;
   },
 
-  /** Find all direct children of a category */
   async findChildren(parentId: number): Promise<Category[]> {
     const [rows] = await pool.query<Category[]>(
       'SELECT * FROM categories WHERE parentId = ? ORDER BY name ASC', [parentId]
     );
-    return rows;
+    return normalizeCategoryNames(rows);
   },
 
-  /**
-   * Return the full breadcrumb path for a category id.
-   * e.g. [ {name:"technique"}, {name:"éclairage & effet"}, {name:"effets speciaux"} ]
-   */
   async findBreadcrumb(id: number): Promise<Category[]> {
     const crumb: Category[] = [];
     let current = await CategoryModel.findById(id);
@@ -93,7 +78,6 @@ export const CategoryModel = {
   },
 
   async create(dto: CreateCategoryDto): Promise<number> {
-    // Auto-compute depth from parent
     let depth = 0;
     if (dto.parentId) {
       const parent = await CategoryModel.findById(dto.parentId);
@@ -115,7 +99,6 @@ export const CategoryModel = {
     if (dto.parentId !== undefined) {
       fields.push('parentId = ?');
       values.push(dto.parentId ?? null);
-      // Recompute depth
       let depth = 0;
       if (dto.parentId) {
         const parent = await CategoryModel.findById(dto.parentId);
@@ -151,4 +134,19 @@ function buildTree(flat: Category[], parentId: number | null): CategoryNode[] {
       depth:    c.depth,
       children: buildTree(flat, c.id),
     }));
+}
+
+function titleCase(str: string): string {
+  if (!str) return str;
+  return str
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+function normalizeCategoryNames(categories: Category[]): Category[] {
+  return categories.map(c => ({
+    ...c,
+    name: c.depth === 0 ? titleCase(c.name) : c.name,
+  }));
 }
