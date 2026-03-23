@@ -1,9 +1,15 @@
-import { Router }        from 'express';
-import { body }           from 'express-validator';
-import { validate }       from '../middlewares/validate';
-import { authenticate }   from '../middlewares/auth.middleware';
-import { authRateLimiter }from '../middlewares/rateLimiter';
-import { register, login, logout } from '../controllers/auth.controller';
+import { Router } from 'express';
+import { body }   from 'express-validator';
+import { validate }        from '../middlewares/validate';
+import { authenticate }    from '../middlewares/auth.middleware';
+import { authRateLimiter } from '../middlewares/rateLimiter';
+import {
+  register,
+  login,
+  logout,
+  verifyAccount,
+  resendActivation,
+} from '../controllers/auth.controller';
 
 const router = Router();
 
@@ -17,7 +23,7 @@ router.post(
     body('password').isLength({ min: 6 }),
   ],
   validate,
-  register
+  register,
 );
 
 router.post(
@@ -28,7 +34,26 @@ router.post(
     body('password').notEmpty(),
   ],
   validate,
-  login
+  login,
+);
+
+router.post(
+  '/verify-account',
+  authRateLimiter,
+  [
+    body('email').isEmail().normalizeEmail(),
+    body('otp').isLength({ min: 6, max: 6 }).isNumeric(),
+  ],
+  validate,
+  verifyAccount,
+);
+
+router.post(
+  '/resend-activation',
+  authRateLimiter,
+  [body('email').isEmail().normalizeEmail()],
+  validate,
+  resendActivation,
 );
 
 router.post('/logout', authenticate, logout);

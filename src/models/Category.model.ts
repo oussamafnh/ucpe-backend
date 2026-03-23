@@ -1,40 +1,41 @@
 import pool from '../database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
-// ── Interfaces ────────────────────────────────────────────────────────────────
-
 export interface Category extends RowDataPacket {
-  id:        number;
-  name:      string;
-  slug:      string;
-  parentId:  number | null;
-  depth:     number;
-  createdAt: Date;
-  updatedAt: Date;
+  id:          number;
+  name:        string;
+  slug:        string;
+  parentId:    number | null;
+  depth:       number;
+  image:       string | null;
+  description: string | null;
+  createdAt:   Date;
+  updatedAt:   Date;
 }
 
 export interface CategoryNode {
-  id:       number;
-  name:     string;
-  slug:     string;
-  parentId: number | null;
-  depth:    number;
-  children: CategoryNode[];
+  id:          number;
+  name:        string;
+  slug:        string;
+  parentId:    number | null;
+  depth:       number;
+  image:       string | null;
+  description: string | null;
+  children:    CategoryNode[];
 }
 
 export interface CreateCategoryDto {
-  name:     string;
-  slug:     string;
-  parentId?: number | null;
+  name:         string;
+  slug:         string;
+  parentId?:    number | null;
+  description?: string | null;
 }
-
-// ── Model ─────────────────────────────────────────────────────────────────────
 
 export const CategoryModel = {
 
   async findAll(): Promise<Category[]> {
     const [rows] = await pool.query<Category[]>(
-      'SELECT id, name, slug, parentId, depth FROM categories ORDER BY depth ASC, name ASC'
+      'SELECT id, name, slug, parentId, depth, image, description FROM categories ORDER BY depth ASC, name ASC'
     );
     return normalizeCategoryNames(rows);
   },
@@ -84,8 +85,8 @@ export const CategoryModel = {
       depth = parent ? parent.depth + 1 : 0;
     }
     const [result] = await pool.query<ResultSetHeader>(
-      'INSERT INTO categories (name, slug, parentId, depth) VALUES (?, ?, ?, ?)',
-      [dto.name, dto.slug, dto.parentId ?? null, depth]
+      'INSERT INTO categories (name, slug, parentId, depth, description) VALUES (?, ?, ?, ?, ?)',
+      [dto.name, dto.slug, dto.parentId ?? null, depth, dto.description ?? null]
     );
     return result.insertId;
   },
@@ -94,9 +95,10 @@ export const CategoryModel = {
     const fields: string[] = [];
     const values: unknown[] = [];
 
-    if (dto.name     !== undefined) { fields.push('name = ?');     values.push(dto.name); }
-    if (dto.slug     !== undefined) { fields.push('slug = ?');     values.push(dto.slug); }
-    if (dto.parentId !== undefined) {
+    if (dto.name        !== undefined) { fields.push('name = ?');        values.push(dto.name); }
+    if (dto.slug        !== undefined) { fields.push('slug = ?');        values.push(dto.slug); }
+    if (dto.description !== undefined) { fields.push('description = ?'); values.push(dto.description ?? null); }
+    if (dto.parentId    !== undefined) {
       fields.push('parentId = ?');
       values.push(dto.parentId ?? null);
       let depth = 0;
@@ -116,37 +118,38 @@ export const CategoryModel = {
     );
   },
 
+  async updateImage(id: number, image: string | null): Promise<void> {
+    await pool.query(
+      'UPDATE categories SET image = ?, updatedAt = NOW() WHERE id = ?',
+      [image, id]
+    );
+  },
+
   async delete(id: number): Promise<void> {
     await pool.query('DELETE FROM categories WHERE id = ?', [id]);
   },
 };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 function buildTree(flat: Category[], parentId: number | null): CategoryNode[] {
   return flat
     .filter(c => c.parentId === parentId)
     .map(c => ({
-      id:       c.id,
-      name:     c.name,
-      slug:     c.slug,
-      parentId: c.parentId,
-      depth:    c.depth,
-      children: buildTree(flat, c.id),
+      id:          c.id,
+      name:        c.name,
+      slug:        c.slug,
+      parentId:    c.parentId,
+      depth:       c.depth,
+      image:       c.image,
+      description: c.description,
+      children:    buildTree(flat, c.id),
     }));
 }
 
 function titleCase(str: string): string {
   if (!str) return str;
-  return str
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+  return str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
 function normalizeCategoryNames(categories: Category[]): Category[] {
-  return categories.map(c => ({
-    ...c,
-    name: c.depth === 0 ? titleCase(c.name) : c.name,
-  }));
+  return categories.map(c => ({ ...c, name: c.depth === 0 ? titleCase(c.name) : c.name }));
 }
