@@ -2,18 +2,24 @@ import pool from '../database/connection';
 import { RowDataPacket, ResultSetHeader } from 'mysql2';
 
 export interface Inspiration extends RowDataPacket {
-  id:        number;
-  url:       string;
-  filename:  string;
-  alt:       string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  id:          number;
+  url:         string;
+  filename:    string;
+  alt:         string | null;
+  title:       string;
+  description: string | null;
+  tag:         string | null;
+  createdAt:   Date;
+  updatedAt:   Date;
 }
 
 export interface CreateInspirationDto {
-  url:      string;
-  filename: string;
-  alt?:     string | null;
+  url:          string;
+  filename:     string;
+  alt?:         string | null;
+  title?:       string;
+  description?: string | null;
+  tag?:         string | null;
 }
 
 export const InspirationModel = {
@@ -35,8 +41,15 @@ export const InspirationModel = {
 
   async create(data: CreateInspirationDto): Promise<number> {
     const [result] = await pool.query<ResultSetHeader>(
-      'INSERT INTO inspirations (url, filename, alt) VALUES (?, ?, ?)',
-      [data.url, data.filename, data.alt ?? null]
+      'INSERT INTO inspirations (url, filename, alt, title, description, tag) VALUES (?, ?, ?, ?, ?, ?)',
+      [
+        data.url,
+        data.filename,
+        data.alt         ?? null,
+        data.title       ?? '',
+        data.description ?? null,
+        data.tag         ?? null,
+      ]
     );
     return result.insertId;
   },

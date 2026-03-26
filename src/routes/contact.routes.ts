@@ -8,26 +8,28 @@ import {
   submitMessage,
   markAsRead,
   deleteMessage,
+  replyToMessage,
+  getReplies,
 } from '../controllers/contact.controller';
 
 const router = Router();
 
-// Public — anyone can submit a message
+// ── Public ────────────────────────────────────────────────────────────────────
 router.post(
   '/',
   [
     body('name').trim().notEmpty().withMessage('Le nom est requis'),
     body('email').isEmail().withMessage('Email invalide'),
     body('sujet').trim().notEmpty().withMessage('Le sujet est requis'),
-    body('message').trim().isLength({ min: 10 }).withMessage('Message trop court'),
+    body('message').trim().notEmpty().withMessage('Message trop court'),
   ],
   validate,
   submitMessage
 );
 
-// Admin only
-router.get('/',             authenticate, authorize('admin'), listMessages);
-router.get('/unread-count', authenticate, authorize('admin'), getUnreadCount);
+// ── Admin only ────────────────────────────────────────────────────────────────
+router.get('/',              authenticate, authorize('admin'), listMessages);
+router.get('/unread-count',  authenticate, authorize('admin'), getUnreadCount);
 
 router.patch(
   '/:id/read',
@@ -43,6 +45,27 @@ router.delete(
   [param('id').isInt()],
   validate,
   deleteMessage
+);
+
+router.post(
+  '/:id/reply',
+  authenticate, authorize('admin'),
+  [
+    param('id').isInt(),
+    body('subject').trim().notEmpty().withMessage('Sujet requis'),
+    body('body').trim().isLength({ min: 1 }).withMessage('Message requis'),
+  ],
+  validate,
+  replyToMessage
+);
+
+// New: fetch stored replies for a message
+router.get(
+  '/:id/replies',
+  authenticate, authorize('admin'),
+  [param('id').isInt()],
+  validate,
+  getReplies
 );
 
 export default router;

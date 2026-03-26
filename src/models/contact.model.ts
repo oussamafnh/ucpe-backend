@@ -12,11 +12,25 @@ export interface ContactMessage extends RowDataPacket {
   updatedAt: Date;
 }
 
+export interface ContactReply extends RowDataPacket {
+  id:         number;
+  contact_id: number;
+  subject:    string;
+  body:       string;
+  sentAt:     Date;
+}
+
 export interface CreateContactDto {
   name:    string;
   email:   string;
   sujet:   string;
   message: string;
+}
+
+export interface CreateReplyDto {
+  contact_id: number;
+  subject:    string;
+  body:       string;
 }
 
 export const ContactModel = {
@@ -62,4 +76,29 @@ export const ContactModel = {
     return Number(total);
   },
 
+  // ── Replies ──────────────────────────────────────────────────────────────
+
+  async createReply(data: CreateReplyDto): Promise<number> {
+    const [result] = await pool.query<ResultSetHeader>(
+      'INSERT INTO contact_replies (contact_id, subject, body) VALUES (?, ?, ?)',
+      [data.contact_id, data.subject, data.body]
+    );
+    return result.insertId;
+  },
+
+  async findRepliesByContactId(contact_id: number): Promise<ContactReply[]> {
+    const [rows] = await pool.query<ContactReply[]>(
+      'SELECT * FROM contact_replies WHERE contact_id = ? ORDER BY sentAt ASC',
+      [contact_id]
+    );
+    return rows;
+  },
+
+  async hasReplies(contact_id: number): Promise<boolean> {
+    const [[{ total }]] = await pool.query<any[]>(
+      'SELECT COUNT(*) AS total FROM contact_replies WHERE contact_id = ?',
+      [contact_id]
+    );
+    return Number(total) > 0;
+  },
 };

@@ -1,89 +1,82 @@
-import { Router }      from 'express';
-import { body, param }  from 'express-validator';
-import { validate }     from '../middlewares/validate';
+import { Router } from 'express';
+import { param, body } from 'express-validator';
+import { validate }                from '../middlewares/validate';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import {
-  getProductStats,
-  getVariantGroups,
   getProducts,
   getProductBySlug,
   getProductVariants,
+  getProductStats,
+  getVariantGroups,
   createProduct,
   updateProduct,
+  deleteProduct,
   toggleStock,
   setDiscount,
-  deleteProduct,
   setVariant,
 } from '../controllers/product.controller';
 
 const router = Router();
 
-// ── Public ────────────────────────────────────────────────────────────────────
-router.get('/', getProducts);
+// ── Public ─────────────────────────────────────────────────────────────────────
+router.get('/',                getProducts);
+router.get('/stats',           authenticate, authorize('admin'), getProductStats);
+router.get('/variant-groups',  authenticate, authorize('admin'), getVariantGroups);
+router.get('/:slug',           getProductBySlug);
+router.get('/:slug/variants',  getProductVariants);
 
-// !! All literal paths MUST come before /:slug
-router.get('/stats',          authenticate, authorize('admin'), getProductStats);
-router.get('/variant-groups', authenticate, authorize('admin'), getVariantGroups);
-
-router.get('/:slug',          getProductBySlug);
-router.get('/:slug/variants', getProductVariants);
-
-// ── Admin only ────────────────────────────────────────────────────────────────
+// ── Admin — create ─────────────────────────────────────────────────────────────
 router.post(
   '/',
   authenticate, authorize('admin'),
-  [body('title').notEmpty().trim()],
-  validate,
-  createProduct
+  createProduct,
 );
 
+// ── Admin — update ─────────────────────────────────────────────────────────────
 router.put(
   '/:id',
   authenticate, authorize('admin'),
-  [param('id').isInt()],
-  validate,
-  updateProduct
+  [param('id').isInt()], validate,
+  updateProduct,
 );
 
+router.patch(
+  '/:id',
+  authenticate, authorize('admin'),
+  [param('id').isInt()], validate,
+  updateProduct,
+);
+
+// ── Admin — stock ──────────────────────────────────────────────────────────────
 router.patch(
   '/:id/stock',
   authenticate, authorize('admin'),
-  [param('id').isInt(), body('inStock').isBoolean()],
-  validate,
-  toggleStock
+  [param('id').isInt(), body('inStock').isBoolean()], validate,
+  toggleStock,
 );
 
+// ── Admin — discount ───────────────────────────────────────────────────────────
 router.patch(
   '/:id/discount',
   authenticate, authorize('admin'),
-  [param('id').isInt(), body('discountPercent').isInt({ min: 0, max: 100 })],
-  validate,
-  setDiscount
+  [param('id').isInt()], validate,
+  setDiscount,
 );
 
+// ── Admin — variant ────────────────────────────────────────────────────────────
 router.patch(
   '/:id/variant',
   authenticate, authorize('admin'),
-  [
-    param('id').isInt(),
-    body('isInVariant').isBoolean(),
-    body('variantId').custom((val) => {
-      if (val !== null && typeof val !== 'string') {
-        throw new Error('variantId must be a string or null');
-      }
-      return true;
-    }),
-  ],
-  validate,
-  setVariant
+  [param('id').isInt()], validate,
+  setVariant,
 );
 
+// ── Admin — delete ─────────────────────────────────────────────────────────────
 router.delete(
   '/:id',
   authenticate, authorize('admin'),
-  [param('id').isInt()],
-  validate,
-  deleteProduct
+  [param('id').isInt()], validate,
+  deleteProduct,
 );
 
 export default router;
