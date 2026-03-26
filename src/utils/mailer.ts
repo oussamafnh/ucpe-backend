@@ -59,7 +59,6 @@ export async function sendAccountActivationEmail(to: string, otp: string): Promi
     `,
   });
 }
-
 export async function sendReplyEmail(
   to: string,
   subject: string,
@@ -77,24 +76,31 @@ export async function sendReplyEmail(
     html: `
 <!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8" /></head>
-<body>
+<head><meta charset="UTF-8"/></head>
+<body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+
+  <p style="font-size:13px;color:#6b7280;margin:0 0 24px;">Réponse à votre message</p>
+
+  <p style="font-size:15px;color:#111;margin:0 0 20px;">
+    <strong>${subject}</strong>
+  </p>
+
   ${originalSubject ? `
-  <div style="border-left:3px solid #cccccc;padding-left:12px;
-              color:#888888;font-style:italic;font-size:13px;">
-    En réponse à : ${originalSubject.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+  <div style="border-left:3px solid #e5e5e5;padding-left:12px;margin-bottom:20px;">
+    <span style="font-size:11px;color:#888888;">En réponse à : ${originalSubject.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
   </div>
-  <br/>
   ` : ''}
-  <p>${bodyHtml}</p>
-  <br/><br/>
-  <p style="font-size:11px;color:#aaaaaa;">
+
+  <p style="font-size:14px;color:#111111;line-height:1.65;margin:0 0 24px;">${bodyHtml}</p>
+
+  <br/>
+  <p style="font-size:11px;color:#aaaaaa;margin:0;">
     Vous recevez cet email suite à votre message via notre formulaire de contact.<br/>
     © ${year} UCPE. Tous droits réservés.
   </p>
+
 </body>
-</html>
-    `,
+</html>`,
   });
 }
 
@@ -102,19 +108,45 @@ export async function sendDevisReplyEmail(
   to: string,
   subject: string,
   body: string,
-  totalFinal: number | null = null
+  totalFinal: number | null = null,
+  codePromo?: string,
+  promoValue?: number,
+  totalProduits?: number,
 ): Promise<void> {
   const year = new Date().getFullYear();
   const escapedBody = body.replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const bodyHtml = escapedBody.replace(/\n/g, '<br/>');
 
+  const discountAmount = (codePromo && promoValue != null && totalProduits != null) ? (totalProduits * promoValue) / 100 : null;
+  const totalApresPromo = discountAmount != null && totalProduits != null ? totalProduits - discountAmount : null;
+
   const totalBlock = totalFinal !== null ? `
-  <div style="border-left:3px solid #cccccc;padding-left:12px;margin-bottom:20px;">
-    <span style="font-size:11px;color:#888888;">Total de votre devis</span><br/>
-    <strong style="font-size:16px;color:#111111;">${totalFinal.toFixed(2)} € HT</strong>
-    <span style="font-size:12px;color:#888888;"> · ${(totalFinal * 1.2).toFixed(2)} € TTC</span>
-  </div>
-  ` : '';
+<table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+  <tbody>
+    ${totalApresPromo != null ? `
+    <tr>
+      <td style="padding:5px 0;font-size:13px;color:#6b7280;">Total produits</td>
+      <td style="padding:5px 0;font-size:13px;color:#6b7280;text-align:right;text-decoration:line-through;">${totalProduits!.toFixed(2)} € HT</td>
+    </tr>
+    <tr>
+      <td style="padding:3px 0;font-size:12px;color:#6b7280;">Code promo <strong style="color:#111111;font-family:monospace;">${codePromo}</strong> −${promoValue}%</td>
+      <td style="padding:3px 0;font-size:12px;color:#111111;text-align:right;font-weight:700;">−${discountAmount!.toFixed(2)} € HT</td>
+    </tr>
+    <tr>
+      <td style="padding:5px 0;font-size:12px;color:#6b7280;">Après remise</td>
+      <td style="padding:5px 0;font-size:13px;color:#111111;text-align:right;font-weight:700;">${totalApresPromo.toFixed(2)} € HT</td>
+    </tr>
+    ` : ''}
+    <tr>
+      <td style="padding:8px 0 2px;font-size:13px;color:#111111;font-weight:700;border-top:2px solid #111111;">Total final</td>
+      <td style="padding:8px 0 2px;font-size:14px;color:#111111;text-align:right;font-weight:800;border-top:2px solid #111111;">${totalFinal.toFixed(2)} € HT</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:0 0 4px;font-size:11px;color:#888888;text-align:right;">${(totalFinal * 1.2).toFixed(2)} € TTC</td>
+    </tr>
+  </tbody>
+</table>
+` : '';
 
   await transporter.sendMail({
     from: process.env.SMTP_FROM,
@@ -123,22 +155,30 @@ export async function sendDevisReplyEmail(
     html: `
 <!DOCTYPE html>
 <html lang="fr">
-<head><meta charset="UTF-8" /></head>
-<body>
+<head><meta charset="UTF-8"/></head>
+<body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
+
+  <p style="font-size:13px;color:#6b7280;margin:0 0 24px;">Réponse à votre demande de devis</p>
+
+  <p style="font-size:15px;color:#111;margin:0 0 20px;">
+    <strong>${subject}</strong>
+  </p>
+
   ${totalBlock}
-  <p>${bodyHtml}</p>
+
+  <p style="font-size:14px;color:#111111;line-height:1.65;margin:0 0 24px;">${bodyHtml}</p>
+
   <br/>
-  <p style="font-size:11px;color:#aaaaaa;">
+  <p style="font-size:11px;color:#aaaaaa;margin:0;">
     Vous recevez cet email suite à votre demande de devis.<br/>
     © ${year} UCPE. Tous droits réservés.
   </p>
+
 </body>
-</html>
-    `,
+</html>`,
   });
 }
 
-// ── Admin notification: new devis submitted ───────────────────────────────────
 export async function sendNewDevisAdminEmail(options: {
   devisId: number;
   clientName: string;
@@ -156,8 +196,8 @@ export async function sendNewDevisAdminEmail(options: {
   const { devisId, clientName, clientEmail, items, dateEvenement, lieuVille, codePromo, promoValue, totalProduits } = options;
   const year = new Date().getFullYear();
 
-  const discountAmount   = (codePromo && promoValue != null) ? (totalProduits * promoValue) / 100 : null;
-  const totalApresPromo  = discountAmount != null ? totalProduits - discountAmount : null;
+  const discountAmount = (codePromo && promoValue != null) ? (totalProduits * promoValue) / 100 : null;
+  const totalApresPromo = discountAmount != null ? totalProduits - discountAmount : null;
 
   // Items rows
   const itemsRows = items.map(i =>

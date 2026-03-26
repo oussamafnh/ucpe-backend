@@ -1,12 +1,12 @@
-import { Response }     from 'express';
-import { DevisModel }   from '../models/Devis.model';
+import { Response } from 'express';
+import { DevisModel } from '../models/Devis.model';
 import { ProductModel } from '../models/Product.model';
-import { UserModel }    from '../models/User.model';
+import { UserModel } from '../models/User.model';
 import { CodePromoModel } from '../models/CodePromo.model';
 import { sendDevisReplyEmail, sendNewDevisAdminEmail } from '../utils/mailer';
-import { AppError }     from '../utils/AppError';
+import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
-import { AuthRequest }  from '../types';
+import { AuthRequest } from '../types';
 
 export const submitDevis = asyncHandler(async (req: AuthRequest, res: Response) => {
   const { items, message, dateEvenement, nombreJours, delivery, pickup, codePromo } = req.body as {
@@ -58,7 +58,7 @@ export const submitDevis = asyncHandler(async (req: AuthRequest, res: Response) 
   }
   sendNewDevisAdminEmail({
     devisId: id,
-    clientName:  clientUser ? `${clientUser.firstName} ${clientUser.lastName}`.trim() : `User #${req.user!.id}`,
+    clientName: clientUser ? `${clientUser.firstName} ${clientUser.lastName}`.trim() : `User #${req.user!.id}`,
     clientEmail: clientUser?.email ?? '',
     items: snapshotItems.map(i => ({ title: i.title, quantity: i.quantity, price: i.price })),
     dateEvenement: dateEvenement ?? undefined,
@@ -72,9 +72,9 @@ export const submitDevis = asyncHandler(async (req: AuthRequest, res: Response) 
 });
 
 export const listDevis = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const page     = Math.max(1, parseInt(req.query['pagination[page]'] as string || '1', 10));
+  const page = Math.max(1, parseInt(req.query['pagination[page]'] as string || '1', 10));
   const pageSize = Math.min(100, parseInt(req.query['pagination[pageSize]'] as string || '20', 10));
-  const status   = req.query['filters[status][$eq]'] as any;
+  const status = req.query['filters[status][$eq]'] as any;
   const { rows, total } = await DevisModel.findAll({ status, page, pageSize });
   res.json({ success: true, data: rows, pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) } });
 });
@@ -101,9 +101,9 @@ export const updateDevisStatus = asyncHandler(async (req: AuthRequest, res: Resp
 
 // POST /api/devis/:id/reply — send email + persist reply
 export const replyToDevis = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const id         = parseInt(req.params.id as string, 10);
-  const subject    = (req.body.subject ?? '').toString().trim();
-  const body       = (req.body.body    ?? '').toString().trim();
+  const id = parseInt(req.params.id as string, 10);
+  const subject = (req.body.subject ?? '').toString().trim();
+  const body = (req.body.body ?? '').toString().trim();
   const totalFinal = req.body.totalFinal !== undefined && req.body.totalFinal !== '' && req.body.totalFinal !== null
     ? parseFloat(req.body.totalFinal)
     : null;
@@ -119,7 +119,21 @@ export const replyToDevis = asyncHandler(async (req: AuthRequest, res: Response)
   const user = await UserModel.findById(devis.userId);
   if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
 
-  await sendDevisReplyEmail(user.email, subject, body, totalFinal);
+  // Fetch promo details if a code was applied
+  let promoValue: number | undefined = undefined;
+  let totalProduits: number | undefined = undefined;
+  if (devis.codePromo) {
+    const promo = await CodePromoModel.findByCode(devis.codePromo).catch(() => null);
+    if (promo) promoValue = promo.value;
+    totalProduits = (devis.items as any[]).reduce((s: number, i: any) => s + i.price * i.quantity, 0);
+  }
+
+  await sendDevisReplyEmail(
+    user.email, subject, body, totalFinal,
+    devis.codePromo ?? undefined,
+    promoValue,
+    totalProduits,
+  );
   await DevisModel.createReply({ devis_id: id, subject, body, totalFinal });
 
   // Auto-advance to 'sent' if still pending/processing
