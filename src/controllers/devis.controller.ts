@@ -3,6 +3,7 @@ import { DevisModel } from '../models/Devis.model';
 import { ProductModel } from '../models/Product.model';
 import { UserModel } from '../models/User.model';
 import { CodePromoModel } from '../models/CodePromo.model';
+import { DevisNotificationEmailModel } from '../models/DevisNotificationEmail.model';
 import { sendDevisReplyEmail, sendNewDevisAdminEmail } from '../utils/mailer';
 import { AppError } from '../utils/AppError';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -21,12 +22,10 @@ export const submitDevis = asyncHandler(async (req: AuthRequest, res: Response) 
     return { productId: p.id, title: p.title, price: p.price, quantity: item.quantity, images: p.images || [] };
   }));
 
-  // Validate promo code if provided and increment usage
   let validatedPromoCode: string | undefined = undefined;
   if (codePromo && codePromo.trim() !== '') {
     const promo = await CodePromoModel.findByCode(codePromo.trim());
     if (promo && promo.active) {
-      // Check usage limit
       if (promo.maxUses === null || promo.usedCount < promo.maxUses) {
         validatedPromoCode = promo.code;
         await CodePromoModel.incrementUsed(promo.id);
@@ -47,15 +46,18 @@ export const submitDevis = asyncHandler(async (req: AuthRequest, res: Response) 
 
   const savedDevis = await DevisModel.findById(id);
 
-  // Notify admin — fire-and-forget (don't block the response if email fails)
   const totalProduits = snapshotItems.reduce((s, i) => s + i.price * i.quantity, 0);
   const clientUser = await UserModel.findById(req.user!.id).catch(() => null);
-  // Fetch promo % for the email if a code was applied
+
   let promoValue: number | undefined = undefined;
   if (validatedPromoCode) {
     const promoRecord = await CodePromoModel.findByCode(validatedPromoCode).catch(() => null);
     if (promoRecord) promoValue = promoRecord.value;
   }
+
+  // Fetch extra notification emails — non-blocking
+  const extraEmails = await DevisNotificationEmailModel.findActive().catch(() => [] as string[]);
+
   sendNewDevisAdminEmail({
     devisId: id,
     clientName: clientUser ? `${clientUser.firstName} ${clientUser.lastName}`.trim() : `User #${req.user!.id}`,
@@ -66,6 +68,7 @@ export const submitDevis = asyncHandler(async (req: AuthRequest, res: Response) 
     codePromo: validatedPromoCode ?? undefined,
     promoValue,
     totalProduits,
+    extraEmails,
   }).catch(err => console.error('[mailer] Admin notification failed:', err));
 
   res.status(201).json({ success: true, data: savedDevis });
@@ -99,7 +102,6 @@ export const updateDevisStatus = asyncHandler(async (req: AuthRequest, res: Resp
   res.json({ success: true, data: await DevisModel.findById(id) });
 });
 
-// POST /api/devis/:id/reply — send email + persist reply
 export const replyToDevis = asyncHandler(async (req: AuthRequest, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   const subject = (req.body.subject ?? '').toString().trim();
@@ -119,7 +121,6 @@ export const replyToDevis = asyncHandler(async (req: AuthRequest, res: Response)
   const user = await UserModel.findById(devis.userId);
   if (!user) { res.status(404).json({ success: false, message: 'User not found' }); return; }
 
-  // Fetch promo details if a code was applied
   let promoValue: number | undefined = undefined;
   let totalProduits: number | undefined = undefined;
   if (devis.codePromo) {
@@ -136,7 +137,6 @@ export const replyToDevis = asyncHandler(async (req: AuthRequest, res: Response)
   );
   await DevisModel.createReply({ devis_id: id, subject, body, totalFinal });
 
-  // Auto-advance to 'sent' if still pending/processing
   if (devis.status === 'pending' || devis.status === 'processing') {
     await DevisModel.updateStatus(id, 'sent', undefined, totalFinal ?? undefined);
   } else if (totalFinal !== null) {
@@ -147,7 +147,6 @@ export const replyToDevis = asyncHandler(async (req: AuthRequest, res: Response)
   res.json({ success: true, data: { replies } });
 });
 
-// GET /api/devis/:id/replies
 export const getDevisReplies = asyncHandler(async (req: AuthRequest, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   const devis = await DevisModel.findById(id);

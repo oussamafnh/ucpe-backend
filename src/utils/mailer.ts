@@ -187,11 +187,12 @@ export async function sendNewDevisAdminEmail(options: {
   dateEvenement?: string;
   lieuVille?: string;
   codePromo?: string;
-  promoValue?: number;   // percentage e.g. 10 = 10%
+  promoValue?: number;
   totalProduits: number;
+  extraEmails?: string[];           // ← new
 }): Promise<void> {
-  const adminEmail = process.env.ADMIN_EMAIL;
-  if (!adminEmail) return;
+  const allRecipients = [...new Set(options.extraEmails ?? [])].filter(Boolean);
+  if (!allRecipients.length) return;
 
   const { devisId, clientName, clientEmail, items, dateEvenement, lieuVille, codePromo, promoValue, totalProduits } = options;
   const year = new Date().getFullYear();
@@ -199,7 +200,6 @@ export async function sendNewDevisAdminEmail(options: {
   const discountAmount = (codePromo && promoValue != null) ? (totalProduits * promoValue) / 100 : null;
   const totalApresPromo = discountAmount != null ? totalProduits - discountAmount : null;
 
-  // Items rows
   const itemsRows = items.map(i =>
     `<tr>
       <td style="padding:5px 0;font-size:13px;color:#111111;border-bottom:1px solid #f0f0f0;">${i.title}</td>
@@ -208,7 +208,6 @@ export async function sendNewDevisAdminEmail(options: {
     </tr>`
   ).join('');
 
-  // Totals block — simple, matches existing email style
   const totalsRows = discountAmount != null && totalApresPromo != null ? `
     <tr>
       <td colspan="2" style="padding:8px 0 3px;font-size:12px;color:#6b7280;">Sous-total produits</td>
@@ -240,39 +239,36 @@ export async function sendNewDevisAdminEmail(options: {
     : '';
   const lieuLine = lieuVille ? `<br/>Lieu : ${lieuVille}` : '';
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
-    to: adminEmail,
-    subject: `Nouvelle demande de devis #${devisId} — ${clientName}`,
-    html: `
+  const html = `
 <!DOCTYPE html>
 <html lang="fr">
 <head><meta charset="UTF-8"/></head>
 <body style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-
   <p style="font-size:13px;color:#6b7280;margin:0 0 24px;">Nouvelle demande de devis</p>
-
   <p style="font-size:15px;color:#111;margin:0 0 4px;">
     <strong>Devis #${devisId}</strong> — ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
   </p>
   <p style="font-size:13px;color:#555;margin:0 0 20px;">
     ${clientName} &lt;${clientEmail}&gt;${eventLine}${lieuLine}
   </p>
-
   <table style="width:100%;border-collapse:collapse;margin-bottom:8px;">
     <tbody>
       ${itemsRows}
       ${totalsRows}
     </tbody>
   </table>
-
   <br/>
   <p style="font-size:11px;color:#aaaaaa;margin:0;">
     Vous recevez cet email car une nouvelle demande de devis a été soumise sur UCPE.<br/>
     © ${year} UCPE. Tous droits réservés.
   </p>
-
 </body>
-</html>`,
+</html>`;
+
+  await transporter.sendMail({
+    from: process.env.SMTP_FROM,
+    to: allRecipients.join(', '),
+    subject: `Nouvelle demande de devis #${devisId} — ${clientName}`,
+    html,
   });
 }

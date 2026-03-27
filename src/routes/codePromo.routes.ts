@@ -1,3 +1,5 @@
+// codePromo.routes.ts
+
 import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { validate } from '../middlewares/validate';
@@ -5,10 +7,18 @@ import { authenticate, authorizeEmployee } from '../middlewares/auth.middleware'
 import {
   listCodePromos, getCodePromoById, createCodePromo,
   updateCodePromo, deleteCodePromo, validateCodePromo,
+  hideCodePromo, getCodePromoInfo,
 } from '../controllers/codePromo.controller';
 
 const router = Router();
 
+// Public endpoint for code info (for display purposes)
+router.get('/info',
+  [query('code').trim().notEmpty().withMessage('Code requis')],
+  validate, getCodePromoInfo
+);
+
+// Validation endpoint for cart (only active/visible codes)
 router.get('/validate',
   [query('code').trim().notEmpty().withMessage('Code requis')],
   validate, validateCodePromo
@@ -41,7 +51,7 @@ router.patch('/:id', authenticate, authorizeEmployee('coupons'),
 );
 
 router.delete('/:id', authenticate, authorizeEmployee('coupons'),
-  [param('id').isInt()], validate, deleteCodePromo
+  [param('id').isInt()], validate, hideCodePromo  
 );
 
 export default router;

@@ -19,6 +19,7 @@ import passwordResetRoutes from './routes/passwordReset.routes';
 import blogRoutes from './routes/blog.routes';
 import codePromoRoutes from './routes/codePromo.routes';
 import employeeRoutes from './routes/employee.routes';
+import devisNotifEmailsRouter from './routes/devisNotifEmails.routes';
 
 
 const app = express();
@@ -68,6 +69,7 @@ app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/codepromo', codePromoRoutes);
 app.use('/api/employees', employeeRoutes);
+app.use('/api/admin/devis-notif-emails', devisNotifEmailsRouter);
 
 
 

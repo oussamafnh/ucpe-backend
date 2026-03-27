@@ -1,18 +1,20 @@
+// codepromo.controller.ts
+
 import { Response } from 'express';
 import { CodePromoModel } from '../models/CodePromo.model';
-import { AppError }       from '../utils/AppError';
-import { asyncHandler }   from '../utils/asyncHandler';
-import { AuthRequest }    from '../types';
+import { AppError } from '../utils/AppError';
+import { asyncHandler } from '../utils/asyncHandler';
+import { AuthRequest } from '../types';
 
 // ── Admin ────────────────────────────────────────────────────────────────────
 
 export const listCodePromos = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const page     = Math.max(1, parseInt(req.query['pagination[page]']     as string || '1',  10));
+  const page = Math.max(1, parseInt(req.query['pagination[page]'] as string || '1', 10));
   const pageSize = Math.min(100, parseInt(req.query['pagination[pageSize]'] as string || '50', 10));
   const activeQs = req.query['filters[active]'];
-  const active   = activeQs === undefined ? undefined : activeQs === 'true' || activeQs === '1';
+  const active = activeQs === undefined ? undefined : activeQs === 'true' || activeQs === '1';
 
-  const { rows, total } = await CodePromoModel.findAll({ active, page, pageSize });
+  const { rows, total } = await CodePromoModel.findAllForAdmin({ active, page, pageSize });
   res.json({
     success: true,
     data: rows,
@@ -37,7 +39,7 @@ export const createCodePromo = asyncHandler(async (req: AuthRequest, res: Respon
 });
 
 export const updateCodePromo = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const id    = parseInt(req.params.id as string, 10);
+  const id = parseInt(req.params.id as string, 10);
   const promo = await CodePromoModel.findById(id);
   if (!promo) throw new AppError('Code promo introuvable', 404);
 
@@ -53,11 +55,11 @@ export const updateCodePromo = asyncHandler(async (req: AuthRequest, res: Respon
 });
 
 export const deleteCodePromo = asyncHandler(async (req: AuthRequest, res: Response) => {
-  const id    = parseInt(req.params.id as string, 10);
+  const id = parseInt(req.params.id as string, 10);
   const promo = await CodePromoModel.findById(id);
   if (!promo) throw new AppError('Code promo introuvable', 404);
   await CodePromoModel.delete(id);
-  res.json({ success: true, message: 'Code promo supprimé' });
+  res.json({ success: true, message: 'Code promo masqué' });
 });
 
 // ── Public / Client ──────────────────────────────────────────────────────────
@@ -76,9 +78,44 @@ export const validateCodePromo = asyncHandler(async (req: AuthRequest, res: Resp
   res.json({
     success: true,
     data: {
-      id:    promo.id,
-      code:  promo.code,
-      value: promo.value, 
+      id: promo.id,
+      code: promo.code,
+      value: promo.value,
     },
   });
+});
+
+// NEW ENDPOINT: Get code info without validation (for display purposes)
+export const getCodePromoInfo = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const code = ((req.query.code as string) || '').trim().toUpperCase();
+  if (!code) throw new AppError('Code requis', 400);
+
+  const promo = await CodePromoModel.findByCodeForInfo(code);
+  if (!promo) {
+    // Return null but not error - this allows frontend to show "code not found"
+    return res.json({ success: true, data: null });
+  }
+
+  // Return info even if inactive or limit reached
+  res.json({
+    success: true,
+    data: {
+      id: promo.id,
+      code: promo.code,
+      value: promo.value,
+      active: promo.active,
+      maxUses: promo.maxUses,
+      usedCount: promo.usedCount,
+      visibilityStatus: promo.visibilityStatus,
+      limitReached: promo.maxUses !== null && promo.usedCount >= promo.maxUses,
+    },
+  });
+});
+
+export const hideCodePromo = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  const promo = await CodePromoModel.findById(id);
+  if (!promo) throw new AppError('Code promo introuvable', 404);
+  await CodePromoModel.hide(id);
+  res.json({ success: true, message: 'Code promo masqué' });
 });
