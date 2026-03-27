@@ -126,9 +126,18 @@ export const CategoryModel = {
   },
 
   async delete(id: number): Promise<void> {
-    await pool.query('DELETE FROM categories WHERE id = ?', [id]);
+    const all = await CategoryModel.findAll();
+    const idsToDelete = collectSubtree(all, id);
+    if (idsToDelete.length === 0) return;
+    const placeholders = idsToDelete.map(() => '?').join(',');
+    await pool.query(
+      `DELETE FROM categories WHERE id IN (${placeholders})`,
+      idsToDelete
+    );
   },
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buildTree(flat: Category[], parentId: number | null): CategoryNode[] {
   return flat
@@ -143,6 +152,14 @@ function buildTree(flat: Category[], parentId: number | null): CategoryNode[] {
       description: c.description,
       children:    buildTree(flat, c.id),
     }));
+}
+
+function collectSubtree(flat: Category[], rootId: number): number[] {
+  const ids: number[] = [rootId];
+  for (const child of flat.filter(c => c.parentId === rootId)) {
+    ids.push(...collectSubtree(flat, child.id));
+  }
+  return ids;
 }
 
 function titleCase(str: string): string {

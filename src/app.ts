@@ -18,6 +18,7 @@ import contactRoutes from './routes/contact.routes';
 import passwordResetRoutes from './routes/passwordReset.routes';
 import blogRoutes from './routes/blog.routes';
 import codePromoRoutes from './routes/codePromo.routes';
+import employeeRoutes from './routes/employee.routes';
 
 
 const app = express();
@@ -66,6 +67,8 @@ app.use('/api/contact', contactRoutes);
 app.use('/api/password-reset', passwordResetRoutes);
 app.use('/api/blog', blogRoutes);
 app.use('/api/codepromo', codePromoRoutes);
+app.use('/api/employees', employeeRoutes);
+
 
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));

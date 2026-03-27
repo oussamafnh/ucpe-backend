@@ -1,67 +1,48 @@
-import { Router }      from 'express';
+import { Router } from 'express';
 import { body, param } from 'express-validator';
-import { validate }    from '../middlewares/validate';
-import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { validate } from '../middlewares/validate';
+import { authenticate, authorizeEmployee } from '../middlewares/auth.middleware';
 import {
-  getCategories,
-  getCategoryTree,
-  getCategoryChildren,
-  getCategoryBreadcrumb,
-  createCategory,
-  updateCategory,
-  updateCategoryImage,
-  deleteCategory,
+  getCategories, getCategoryTree, getCategoryChildren, getCategoryBreadcrumb,
+  createCategory, updateCategory, updateCategoryImage, deleteCategory,
 } from '../controllers/category.controller';
 
 const router = Router();
 
-router.get('/',               getCategories);
-router.get('/tree',           getCategoryTree);
-router.get('/:id/children',   getCategoryChildren);
+router.get('/', getCategories);
+router.get('/tree', getCategoryTree);
+router.get('/:id/children', getCategoryChildren);
 router.get('/:id/breadcrumb', getCategoryBreadcrumb);
 
-router.post(
-  '/',
-  authenticate, authorize('admin'),
+router.post('/', authenticate, authorizeEmployee('categories'),
   [
     body('name').notEmpty().trim(),
-    body('parentId').optional().isInt({ min: 1 }),
+    body('parentId').optional({ nullable: true }).isInt({ min: 1 }),
     body('description').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
   ],
-  validate,
-  createCategory,
+  validate, createCategory
 );
 
-router.put(
-  '/:id',
-  authenticate, authorize('admin'),
+router.put('/:id', authenticate, authorizeEmployee('categories'),
   [
     param('id').isInt(),
     body('name').optional().notEmpty().trim(),
-    body('parentId').optional().isInt({ min: 1 }),
+    body('parentId').optional({ nullable: true }).isInt({ min: 1 }),
     body('description').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
   ],
-  validate,
-  updateCategory,
+  validate, updateCategory
 );
 
-router.patch(
-  '/:id/image',
-  authenticate, authorize('admin'),
+router.patch('/:id/image', authenticate, authorizeEmployee('categories'),
   [
     param('id').isInt(),
     body('image').optional({ nullable: true }),
   ],
-  validate,
-  updateCategoryImage,
+  validate, updateCategoryImage
 );
 
-router.delete(
-  '/:id',
-  authenticate, authorize('admin'),
-  [param('id').isInt()],
-  validate,
-  deleteCategory,
+router.delete('/:id', authenticate, authorizeEmployee('categories'),
+  [param('id').isInt()], validate, deleteCategory
 );
 
 export default router;

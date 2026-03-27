@@ -78,7 +78,7 @@ export const validateCodePromo = asyncHandler(async (req: AuthRequest, res: Resp
     data: {
       id:    promo.id,
       code:  promo.code,
-      value: promo.value,   // percentage
+      value: promo.value, 
     },
   });
 });

@@ -3,40 +3,41 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2';
 import { UserRole } from '../types';
 
 export interface User extends RowDataPacket {
-  id:          number;
-  firstName:   string;
-  lastName:    string;
-  email:       string;
-  password:    string;
-  country:     string | null;
-  address:     string | null;
-  phone:       string | null;
-  role:        UserRole;
-  blocked:     boolean;
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  country: string | null;
+  address: string | null;
+  phone: string | null;
+  role: UserRole;
+  blocked: boolean;
   isActivated: boolean;
-  createdAt:   Date;
-  updatedAt:   Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CreateUserDto {
   firstName: string;
-  lastName:  string;
-  email:     string;
-  password:  string;
-  country?:  string;
-  address?:  string;
-  phone?:    string;
-  role?:     UserRole;
+  lastName: string;
+  email: string;
+  password: string;
+  country?: string;
+  address?: string;
+  phone?: string;
+  role?: UserRole;
+  isActivated?: boolean;
 }
 
 export interface UpdateUserDto {
-  firstName?:   string;
-  lastName?:    string;
-  country?:     string;
-  address?:     string;
-  phone?:       string;
-  password?:    string;
-  blocked?:     boolean;
+  firstName?: string;
+  lastName?: string;
+  country?: string;
+  address?: string;
+  phone?: string;
+  password?: string;
+  blocked?: boolean;
   isActivated?: boolean;
 }
 
@@ -54,11 +55,17 @@ export const UserModel = {
   async create(data: CreateUserDto): Promise<number> {
     const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO users (firstName, lastName, email, password, country, address, phone, role, isActivated)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, FALSE)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        data.firstName, data.lastName, data.email, data.password,
-        data.country || null, data.address || null, data.phone || null,
+        data.firstName,
+        data.lastName,
+        data.email,
+        data.password,
+        data.country || null,
+        data.address || null,
+        data.phone || null,
         data.role || 'client',
+        data.isActivated ? 1 : 0,
       ]
     );
     return result.insertId;
@@ -91,37 +98,42 @@ export const UserModel = {
       const pattern = `%${search}%`;
       const [users] = await pool.query<User[]>(
         `SELECT * FROM users
-         WHERE firstName LIKE ? OR lastName LIKE ? OR email LIKE ?
-            OR CONCAT(firstName, ' ', lastName) LIKE ?
-         ORDER BY createdAt DESC
-         LIMIT ? OFFSET ?`,
+       WHERE role = 'client'
+         AND (firstName LIKE ? OR lastName LIKE ? OR email LIKE ?
+          OR CONCAT(firstName, ' ', lastName) LIKE ?)
+       ORDER BY createdAt DESC
+       LIMIT ? OFFSET ?`,
         [pattern, pattern, pattern, pattern, pageSize, offset]
       );
       const [[{ total }]] = await pool.query<any[]>(
         `SELECT COUNT(*) AS total FROM users
-         WHERE firstName LIKE ? OR lastName LIKE ? OR email LIKE ?
-            OR CONCAT(firstName, ' ', lastName) LIKE ?`,
+       WHERE role = 'client'
+         AND (firstName LIKE ? OR lastName LIKE ? OR email LIKE ?
+          OR CONCAT(firstName, ' ', lastName) LIKE ?)`,
         [pattern, pattern, pattern, pattern]
       );
       return { users, total };
     }
 
     const [users] = await pool.query<User[]>(
-      'SELECT * FROM users ORDER BY createdAt DESC LIMIT ? OFFSET ?',
+      `SELECT * FROM users WHERE role = 'client' ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
       [pageSize, offset]
     );
-    const [[{ total }]] = await pool.query<any[]>('SELECT COUNT(*) AS total FROM users');
+    const [[{ total }]] = await pool.query<any[]>(
+      `SELECT COUNT(*) AS total FROM users WHERE role = 'client'`
+    );
     return { users, total };
   },
 
   async getUsersLast7Days(): Promise<{ date: string; count: number }[]> {
     const [rows] = await pool.query<any[]>(`
-      SELECT DATE(createdAt) AS date, COUNT(*) AS count
-      FROM users
-      WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-      GROUP BY DATE(createdAt)
-      ORDER BY date ASC
-    `);
+    SELECT DATE(createdAt) AS date, COUNT(*) AS count
+    FROM users
+    WHERE createdAt >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
+      AND role = 'client'
+    GROUP BY DATE(createdAt)
+    ORDER BY date ASC
+  `);
 
     const result: { date: string; count: number }[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -134,3 +146,4 @@ export const UserModel = {
     return result;
   },
 };
+
