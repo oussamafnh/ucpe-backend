@@ -20,9 +20,12 @@ import blogRoutes from './routes/blog.routes';
 import codePromoRoutes from './routes/codePromo.routes';
 import employeeRoutes from './routes/employee.routes';
 import devisNotifEmailsRouter from './routes/devisNotifEmails.routes';
+import sitemapRouter from './routes/sitemap.routes';
 
 
 const app = express();
+
+app.use(sitemapRouter);
 
 app.use(helmet());
 app.use(
