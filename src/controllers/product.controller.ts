@@ -15,7 +15,8 @@ export const getProductStats = asyncHandler(async (req: Request, res: Response) 
       SUM(CASE WHEN inStock = 0 THEN 1 ELSE 0 END)                   AS outOfStock,
       SUM(CASE WHEN isInVariant = 1 THEN 1 ELSE 0 END)               AS variantProducts,
       COUNT(DISTINCT CASE WHEN isInVariant = 1 THEN variantId END)   AS variantGroups,
-      SUM(CASE WHEN price IS NULL THEN 1 ELSE 0 END)                 AS noPriceCount
+      SUM(CASE WHEN price IS NULL THEN 1 ELSE 0 END)                 AS noPriceCount,
+      SUM(CASE WHEN isHidden = 1 THEN 1 ELSE 0 END)                  AS hiddenCount
     FROM products
   `);
 
@@ -28,6 +29,7 @@ export const getProductStats = asyncHandler(async (req: Request, res: Response) 
       variantProducts: Number(stats.variantProducts),
       variantGroups:   Number(stats.variantGroups),
       noPriceCount:    Number(stats.noPriceCount),
+      hiddenCount:     Number(stats.hiddenCount),
     },
   });
 });
@@ -70,6 +72,7 @@ export const getProducts = asyncHandler(async (req: Request, res: Response) => {
   const { products, total } = await ProductModel.findAll({
     categorySlug, inStock, isInVariant, variantId, search, minPrice, maxPrice, page, pageSize,
     collapseVariants: !isAdmin,
+    showHidden: isAdmin,   // admin sees hidden products; public never does
   });
 
   res.json({
@@ -110,6 +113,11 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
     ? (body.isForSell === true || body.isForSell === 'true' || body.isForSell === 1)
     : true;
 
+  // isHidden — default false
+  body.isHidden = body.isHidden !== undefined
+    ? (body.isHidden === true || body.isHidden === 'true' || body.isHidden === 1)
+    : false;
+
   // ficheTechnique — allow null/empty
   body.ficheTechnique = body.ficheTechnique?.trim() || null;
 
@@ -118,7 +126,6 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
     const pct  = Math.min(100, Math.max(0, parseInt(body.discountPercent || 0, 10)));
     const euro = body.discountEuro != null ? parseFloat(body.discountEuro) : null;
 
-    // Always store the entered price as originalPrice
     body.originalPrice = base;
 
     if (euro != null && euro > 0) {
@@ -158,27 +165,26 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
     body.isForSell = body.isForSell === true || body.isForSell === 'true' || body.isForSell === 1;
   }
 
+  // isHidden
+  if (body.isHidden !== undefined) {
+    body.isHidden = body.isHidden === true || body.isHidden === 'true' || body.isHidden === 1;
+  }
+
   // ficheTechnique
   if (body.ficheTechnique !== undefined) {
     body.ficheTechnique = body.ficheTechnique?.trim() || null;
   }
 
   // ── Price / discount resolution ──────────────────────────────────────────
-  // We only recalculate if any price-related field is being touched
   const touchingPrice = body.price != null || body.discountPercent != null || body.discountEuro !== undefined;
 
   if (touchingPrice) {
-    // The "base" is always the original (pre-discount) price.
-    // If the request sends a new `price` and no discount, treat that as the new base.
-    // If the request sends a new `price` WITH a discount, also treat it as the new base.
-    // The only exception: if price is NOT in the request, keep the existing originalPrice.
     const base = parseFloat(String(
       body.price != null
-        ? body.price                                   // new base from form
-        : (existing.originalPrice ?? existing.price ?? 0)  // keep existing base
+        ? body.price
+        : (existing.originalPrice ?? existing.price ?? 0)
     ));
 
-    // discountEuro: explicit null means "remove euro discount"; undefined means "don't change"
     const euroRaw = body.discountEuro !== undefined
       ? body.discountEuro
       : existing.discountEuro;
@@ -200,7 +206,6 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
       body.discountEuro    = null;
       body.discountPercent = pct;
     } else {
-      // No discount — price equals base
       body.price           = base;
       body.discountEuro    = null;
       body.discountPercent = 0;
@@ -219,10 +224,15 @@ export const toggleStock = asyncHandler(async (req: Request, res: Response) => {
   res.json({ success: true, data: await ProductModel.findById(id) });
 });
 
+// ── Toggle hidden ─────────────────────────────────────────────────────────────
+
+export const toggleHidden = asyncHandler(async (req: Request, res: Response) => {
+  const id = parseInt(req.params.id as string, 10);
+  await ProductModel.update(id, { isHidden: req.body.isHidden });
+  res.json({ success: true, data: await ProductModel.findById(id) });
+});
+
 // ── Set discount ──────────────────────────────────────────────────────────────
-// Supports both % and € modes.
-// Critically: always uses `originalPrice` as the base so repeated
-// calls don't compound or lose the real starting price.
 
 export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
   const id   = parseInt(req.params.id as string, 10);
@@ -231,8 +241,6 @@ export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
   const product = await ProductModel.findById(id);
   if (!product) throw new AppError('Product not found', 404);
 
-  // Always derive from originalPrice — this is the untouched base.
-  // If originalPrice was never set (legacy data), fall back to current price.
   const base: number = parseFloat(String(product.originalPrice ?? product.price ?? 0));
 
   let newPrice: number;
@@ -244,7 +252,6 @@ export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
     euro = Math.max(0, rawEuro);
 
     if (euro === 0) {
-      // Remove discount — restore to base
       newPrice = base;
       pct      = 0;
       euro     = null;
@@ -253,11 +260,9 @@ export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
       pct      = base > 0 ? Math.round((euro / base) * 100) : 0;
     }
   } else {
-    // percent mode
     pct = Math.min(100, Math.max(0, parseInt(String(req.body.discountPercent ?? 0), 10)));
 
     if (pct === 0) {
-      // Remove discount — restore to base
       newPrice = base;
     } else {
       newPrice = parseFloat((base * (1 - pct / 100)).toFixed(2));
@@ -268,7 +273,7 @@ export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
     discountPercent: pct,
     discountEuro:    euro,
     price:           newPrice,
-    originalPrice:   base,  // always persist the base so future calls stay correct
+    originalPrice:   base,
   });
 
   res.json({ success: true, data: await ProductModel.findById(id) });

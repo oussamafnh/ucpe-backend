@@ -5,7 +5,7 @@ import { authenticate, authorize, authorizeEmployee } from '../middlewares/auth.
 import {
   getProducts, getProductBySlug, getProductVariants, getProductStats,
   getVariantGroups, createProduct, updateProduct, deleteProduct,
-  toggleStock, setDiscount, setVariant,
+  toggleStock, toggleHidden, setDiscount, setVariant,
 } from '../controllers/product.controller';
 
 const router = Router();
@@ -28,6 +28,10 @@ router.patch('/:id', authenticate, authorizeEmployee('products'),
 
 router.patch('/:id/stock', authenticate, authorizeEmployee('products'),
   [param('id').isInt(), body('inStock').isBoolean()], validate, toggleStock
+);
+
+router.patch('/:id/hidden', authenticate, authorizeEmployee('products'),
+  [param('id').isInt(), body('isHidden').isBoolean()], validate, toggleHidden
 );
 
 router.patch('/:id/discount', authenticate, authorizeEmployee('products'),

@@ -17,6 +17,7 @@ export interface Product extends RowDataPacket {
   variantImages:   string[];
   inStock:         boolean;
   isForSell:       boolean;
+  isHidden:        boolean;
   ficheTechnique:  string | null;
   categoryId:      number | null;
   dimensions:      Record<string, unknown> | null;
@@ -38,6 +39,7 @@ export interface CreateProductDto {
   images?:          string[];
   inStock?:         boolean;
   isForSell?:       boolean;
+  isHidden?:        boolean;
   ficheTechnique?:  string | null;
   categoryId?:      number;
   dimensions?:      Record<string, unknown>;
@@ -60,10 +62,16 @@ export const ProductModel = {
     page:              number;
     pageSize:          number;
     collapseVariants?: boolean;
+    showHidden?:       boolean;
   }): Promise<{ products: any[]; total: number }> {
 
     const conditions: string[] = ['1=1'];
     const params: unknown[]    = [];
+
+    // ── Hide from public by default ──────────────────────────────────────────
+    if (!filters.showHidden) {
+      conditions.push('p.isHidden = 0');
+    }
 
     if (filters.categorySlug) {
       conditions.push(`(leaf.slug = ? OR sub.slug = ? OR cat.slug = ?)`);
@@ -248,8 +256,8 @@ export const ProductModel = {
     const [result] = await pool.query<ResultSetHeader>(
       `INSERT INTO products
          (title, slug, reference, description, price, originalPrice, discountPercent, discountEuro,
-          images, inStock, isForSell, ficheTechnique, categoryId, dimensions, isInVariant, variantId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          images, inStock, isForSell, isHidden, ficheTechnique, categoryId, dimensions, isInVariant, variantId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.title,
         data.slug,
@@ -262,6 +270,7 @@ export const ProductModel = {
         JSON.stringify(data.images ?? []),
         data.inStock !== undefined ? (data.inStock ? 1 : 0) : 1,
         data.isForSell !== undefined ? (data.isForSell ? 1 : 0) : 1,
+        data.isHidden ? 1 : 0,
         data.ficheTechnique  ?? null,
         data.categoryId      ?? null,
         data.dimensions      ? JSON.stringify(data.dimensions) : null,
@@ -282,6 +291,7 @@ export const ProductModel = {
     if (map.isInVariant !== undefined) map.isInVariant = map.isInVariant ? 1 : 0;
     if (map.isForSell   !== undefined) map.isForSell   = map.isForSell   ? 1 : 0;
     if (map.inStock     !== undefined) map.inStock     = map.inStock     ? 1 : 0;
+    if (map.isHidden    !== undefined) map.isHidden    = map.isHidden    ? 1 : 0;
 
     const keys   = Object.keys(map);
     const fields = keys.map(k => `\`${k}\` = ?`);
@@ -336,6 +346,7 @@ function parseProduct(row: any, variantImages: string[]) {
   row.inStock     = Boolean(row.inStock);
   row.isInVariant = Boolean(row.isInVariant);
   row.isForSell   = row.isForSell !== undefined ? Boolean(row.isForSell) : true;
+  row.isHidden    = Boolean(row.isHidden);
 
   if (row.price         != null) row.price         = parseFloat(row.price);
   if (row.originalPrice != null) row.originalPrice = parseFloat(row.originalPrice);
