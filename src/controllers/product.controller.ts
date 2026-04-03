@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { ProductModel }      from '../models/Product.model';
-import { AppError }          from '../utils/AppError';
-import { asyncHandler }      from '../utils/asyncHandler';
-import { uniqueSlug }        from '../utils/slugify';
-import pool                  from '../database/connection';
+import { ProductModel } from '../models/Product.model';
+import { AppError } from '../utils/AppError';
+import { asyncHandler } from '../utils/asyncHandler';
+import { uniqueSlug } from '../utils/slugify';
+import pool from '../database/connection';
 
 // ── Product stats (admin overview) ───────────────────────────────────────────
 
@@ -23,13 +23,13 @@ export const getProductStats = asyncHandler(async (req: Request, res: Response) 
   res.json({
     success: true,
     data: {
-      total:           Number(stats.total),
-      inStock:         Number(stats.inStock),
-      outOfStock:      Number(stats.outOfStock),
+      total: Number(stats.total),
+      inStock: Number(stats.inStock),
+      outOfStock: Number(stats.outOfStock),
       variantProducts: Number(stats.variantProducts),
-      variantGroups:   Number(stats.variantGroups),
-      noPriceCount:    Number(stats.noPriceCount),
-      hiddenCount:     Number(stats.hiddenCount),
+      variantGroups: Number(stats.variantGroups),
+      noPriceCount: Number(stats.noPriceCount),
+      hiddenCount: Number(stats.hiddenCount),
     },
   });
 });
@@ -37,9 +37,9 @@ export const getProductStats = asyncHandler(async (req: Request, res: Response) 
 // ── Variant groups ────────────────────────────────────────────────────────────
 
 export const getVariantGroups = asyncHandler(async (req: Request, res: Response) => {
-  const page     = Math.max(1, parseInt(req.query['pagination[page]']       as string || '1',  10));
+  const page = Math.max(1, parseInt(req.query['pagination[page]'] as string || '1', 10));
   const pageSize = Math.min(100, parseInt(req.query['pagination[pageSize]'] as string || '20', 10));
-  const search   = req.query['search'] as string | undefined;
+  const search = req.query['search'] as string | undefined;
 
   const { groups, total } = await ProductModel.findVariantGroups({ search, page, pageSize });
 
@@ -53,17 +53,17 @@ export const getVariantGroups = asyncHandler(async (req: Request, res: Response)
 // ── Public / shared list ──────────────────────────────────────────────────────
 
 export const getProducts = asyncHandler(async (req: Request, res: Response) => {
-  const page         = Math.max(1, parseInt(req.query['pagination[page]']       as string || '1',  10));
-  const pageSize     = Math.min(100, parseInt(req.query['pagination[pageSize]'] as string || '20', 10));
+  const page = Math.max(1, parseInt(req.query['pagination[page]'] as string || '1', 10));
+  const pageSize = Math.min(100, parseInt(req.query['pagination[pageSize]'] as string || '20', 10));
   const categorySlug = req.query['filters[category][slug][$eq]'] as string | undefined;
-  const variantId    = req.query['filters[variantId][$eq]']      as string | undefined;
-  const inStockRaw   = req.query['filters[inStock][$eq]']        as string | undefined;
-  const inStock      = inStockRaw === 'true' ? true : inStockRaw === 'false' ? false : undefined;
+  const variantId = req.query['filters[variantId][$eq]'] as string | undefined;
+  const inStockRaw = req.query['filters[inStock][$eq]'] as string | undefined;
+  const inStock = inStockRaw === 'true' ? true : inStockRaw === 'false' ? false : undefined;
 
   const isInVariantRaw = req.query['filters[isInVariant][$eq]'] as string | undefined;
-  const isInVariant    = isInVariantRaw === 'true' ? true : isInVariantRaw === 'false' ? false : undefined;
+  const isInVariant = isInVariantRaw === 'true' ? true : isInVariantRaw === 'false' ? false : undefined;
 
-  const search   = req.query['search']   as string | undefined;
+  const search = req.query['search'] as string | undefined;
   const minPrice = req.query['minPrice'] ? parseFloat(req.query['minPrice'] as string) : undefined;
   const maxPrice = req.query['maxPrice'] ? parseFloat(req.query['maxPrice'] as string) : undefined;
 
@@ -123,27 +123,27 @@ export const createProduct = asyncHandler(async (req: Request, res: Response) =>
 
   if (body.price != null) {
     const base = parseFloat(body.price);
-    const pct  = Math.min(100, Math.max(0, parseInt(body.discountPercent || 0, 10)));
+    const pct = Math.min(100, Math.max(0, parseInt(body.discountPercent || 0, 10)));
     const euro = body.discountEuro != null ? parseFloat(body.discountEuro) : null;
 
     body.originalPrice = base;
 
     if (euro != null && euro > 0) {
-      body.price           = parseFloat(Math.max(0, base - euro).toFixed(2));
-      body.discountEuro    = euro;
+      body.price = parseFloat(Math.max(0, base - euro).toFixed(2));
+      body.discountEuro = euro;
       body.discountPercent = base > 0 ? Math.round((euro / base) * 100) : 0;
     } else if (pct > 0) {
-      body.price           = parseFloat((base * (1 - pct / 100)).toFixed(2));
-      body.discountEuro    = null;
+      body.price = parseFloat((base * (1 - pct / 100)).toFixed(2));
+      body.discountEuro = null;
       body.discountPercent = pct;
     } else {
-      body.price           = base;
-      body.discountEuro    = null;
+      body.price = base;
+      body.discountEuro = null;
       body.discountPercent = 0;
     }
   }
 
-  const id      = await ProductModel.create({ ...body, slug });
+  const id = await ProductModel.create({ ...body, slug });
   const product = await ProductModel.findById(id);
   res.status(201).json({ success: true, data: product });
 });
@@ -156,7 +156,7 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
     req.body.slug = await uniqueSlug(req.body.title, 'products', id);
   }
 
-  const body     = { ...req.body };
+  const body = { ...req.body };
   const existing = await ProductModel.findById(id);
   if (!existing) throw new AppError('Product not found', 404);
 
@@ -198,16 +198,16 @@ export const updateProduct = asyncHandler(async (req: Request, res: Response) =>
     body.originalPrice = base;
 
     if (euro != null && euro > 0) {
-      body.price           = parseFloat(Math.max(0, base - euro).toFixed(2));
-      body.discountEuro    = euro;
+      body.price = parseFloat(Math.max(0, base - euro).toFixed(2));
+      body.discountEuro = euro;
       body.discountPercent = base > 0 ? Math.round((euro / base) * 100) : 0;
     } else if (pct > 0 && (euro == null || euro === 0)) {
-      body.price           = parseFloat((base * (1 - pct / 100)).toFixed(2));
-      body.discountEuro    = null;
+      body.price = parseFloat((base * (1 - pct / 100)).toFixed(2));
+      body.discountEuro = null;
       body.discountPercent = pct;
     } else {
-      body.price           = base;
-      body.discountEuro    = null;
+      body.price = base;
+      body.discountEuro = null;
       body.discountPercent = 0;
     }
   }
@@ -235,7 +235,7 @@ export const toggleHidden = asyncHandler(async (req: Request, res: Response) => 
 // ── Set discount ──────────────────────────────────────────────────────────────
 
 export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
-  const id   = parseInt(req.params.id as string, 10);
+  const id = parseInt(req.params.id as string, 10);
   const mode = (req.body.discountMode as 'percent' | 'euro' | undefined) ?? 'percent';
 
   const product = await ProductModel.findById(id);
@@ -253,11 +253,11 @@ export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
 
     if (euro === 0) {
       newPrice = base;
-      pct      = 0;
-      euro     = null;
+      pct = 0;
+      euro = null;
     } else {
       newPrice = parseFloat(Math.max(0, base - euro).toFixed(2));
-      pct      = base > 0 ? Math.round((euro / base) * 100) : 0;
+      pct = base > 0 ? Math.round((euro / base) * 100) : 0;
     }
   } else {
     pct = Math.min(100, Math.max(0, parseInt(String(req.body.discountPercent ?? 0), 10)));
@@ -271,9 +271,9 @@ export const setDiscount = asyncHandler(async (req: Request, res: Response) => {
 
   await ProductModel.update(id, {
     discountPercent: pct,
-    discountEuro:    euro,
-    price:           newPrice,
-    originalPrice:   base,
+    discountEuro: euro,
+    price: newPrice,
+    originalPrice: base,
   });
 
   res.json({ success: true, data: await ProductModel.findById(id) });
@@ -292,7 +292,63 @@ export const setVariant = asyncHandler(async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   await ProductModel.update(id, {
     isInVariant: req.body.isInVariant,
-    variantId:   req.body.variantId,
+    variantId: req.body.variantId,
   });
   res.json({ success: true, data: await ProductModel.findById(id) });
+});
+
+
+export const bulkToggleHidden = asyncHandler(async (req: Request, res: Response) => {
+  const { isHidden } = req.body;
+  if (typeof isHidden !== 'boolean') throw new AppError('isHidden must be a boolean', 400);
+  await pool.query('UPDATE products SET isHidden = ?, updatedAt = NOW()', [isHidden ? 1 : 0]);
+  const [[{ count }]] = await (pool as any).query('SELECT COUNT(*) AS count FROM products');
+  res.json({ success: true, message: `${count} products ${isHidden ? 'hidden' : 'shown'}` });
+});
+
+
+// ── Bulk discount ─────────────────────────────────────────────────────────────
+export const bulkSetDiscount = asyncHandler(async (req: Request, res: Response) => {
+  const { discountMode, discountPercent, discountEuro, ids } = req.body;
+  // ids is optional — if omitted, applies to ALL products
+
+  const products = ids?.length
+    ? await Promise.all(ids.map((id: number) => ProductModel.findById(id)))
+    : await (async () => {
+        const { products } = await ProductModel.findAll({
+          page: 1, pageSize: 999999,
+          collapseVariants: false,
+          showHidden: true,
+        });
+        return products;
+      })();
+
+  await Promise.all(
+    products
+      .filter(Boolean)
+      .map(async (product: any) => {
+        const base = parseFloat(String(product.originalPrice ?? product.price ?? 0));
+        if (!base) return;
+
+        let newPrice: number, pct: number, euro: number | null = null;
+
+        if (discountMode === 'euro') {
+          euro = Math.max(0, parseFloat(String(discountEuro ?? 0)));
+          if (euro === 0) { newPrice = base; pct = 0; euro = null; }
+          else { newPrice = parseFloat(Math.max(0, base - euro).toFixed(2)); pct = base > 0 ? Math.round((euro / base) * 100) : 0; }
+        } else {
+          pct = Math.min(100, Math.max(0, parseInt(String(discountPercent ?? 0), 10)));
+          newPrice = pct === 0 ? base : parseFloat((base * (1 - pct / 100)).toFixed(2));
+        }
+
+        return ProductModel.update(product.id, {
+          discountPercent: pct,
+          discountEuro: euro,
+          price: newPrice,
+          originalPrice: base,
+        });
+      })
+  );
+
+  res.json({ success: true, message: 'Discount applied' });
 });

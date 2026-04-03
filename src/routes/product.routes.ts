@@ -6,9 +6,17 @@ import {
   getProducts, getProductBySlug, getProductVariants, getProductStats,
   getVariantGroups, createProduct, updateProduct, deleteProduct,
   toggleStock, toggleHidden, setDiscount, setVariant,
+  bulkToggleHidden,
+  bulkSetDiscount,
 } from '../controllers/product.controller';
 
 const router = Router();
+router.patch('/bulk-hidden', authenticate, authorizeEmployee('products'),
+  [body('isHidden').isBoolean()], validate, bulkToggleHidden
+);
+router.patch('/bulk-discount', authenticate, authorizeEmployee('products'),
+  [body('discountMode').isIn(['percent', 'euro'])], validate, bulkSetDiscount
+);
 
 router.get('/', getProducts);
 router.get('/stats', authenticate, authorizeEmployee('products'), getProductStats);
@@ -45,5 +53,7 @@ router.patch('/:id/variant', authenticate, authorizeEmployee('variants'),
 router.delete('/:id', authenticate, authorizeEmployee('products'),
   [param('id').isInt()], validate, deleteProduct
 );
+
+
 
 export default router;
