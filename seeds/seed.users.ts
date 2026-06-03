@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
-import pool from '../database/connection';
+import pool from '../src/database/connection';
 
 const firstNames = [
   'Alice', 'Bob', 'Clara', 'David', 'Emma', 'Félix', 'Grace', 'Hugo',

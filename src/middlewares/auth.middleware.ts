@@ -74,3 +74,39 @@ export function authorizeEmployee(pageKey: string) {
     }
   };
 }
+
+/**
+ * Multi-key guard for shared resources (e.g. file upload).
+ * - admin: always passes
+ * - employee: must have AT LEAST ONE of the provided pageKeys
+ * - others: rejected
+ */
+export function authorizeAnyEmployee(...pageKeys: string[]) {
+  return async (req: AuthRequest, _res: Response, next: NextFunction) => {
+    try {
+      if (!req.user) throw new AppError('Not authenticated', 401);
+
+      const user = await UserModel.findById(req.user.id);
+      if (!user)        throw new AppError('User no longer exists', 401);
+      if (user.blocked) throw new AppError('Account is blocked', 403);
+
+      if (user.role === 'admin') {
+        req.user = { id: user.id, email: user.email, role: user.role };
+        return next();
+      }
+
+      if (user.role === 'employee') {
+        const perms = await EmployeeModel.getPermissions(user.id);
+        const hasAny = pageKeys.some(key => perms.includes(key));
+        if (!hasAny)
+          throw new AppError('Access to this section is not permitted', 403);
+        req.user = { id: user.id, email: user.email, role: user.role };
+        return next();
+      }
+
+      throw new AppError('You do not have permission to perform this action', 403);
+    } catch (err) {
+      next(err);
+    }
+  };
+}
